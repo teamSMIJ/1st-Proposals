@@ -1,0 +1,39 @@
+int REC = 5;
+int PLAYE = 4;
+
+char input;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(REC, OUTPUT);
+  pinMode(PLAYE, OUTPUT);
+}
+
+void loop() {
+  if(Serial.available())
+  {
+    input = Serial.read();
+    
+    if(input == 'R')
+    {
+      digitalWrite(REC,HIGH);
+      Serial.println("REC...");
+    }
+    else if(input == 'E')
+    {
+      digitalWrite(PLAYE,HIGH);
+      Serial.println("PLAYE...");
+      digitalWrite(PLAYE,LOW);
+    }
+
+    else if(input == 'S')
+    {
+      digitalWrite(REC,LOW);
+      Serial.println("STOP...");
+    }
+    else
+    {
+      Serial.println("wrong input value");
+    }
+  }
+} 

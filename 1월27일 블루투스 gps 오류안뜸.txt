@@ -1,0 +1,184 @@
+
+
+
+#include <SoftwareSerial.h>
+
+#include <TinyGPS.h>
+
+
+
+
+
+#define VIB 0 // 진동핀
+#define REC 3 // 녹음핀
+#define PLAYE 2  // 재생핀
+
+#define BLEBAUD 9600 // 블루투스통신 포트
+#define RXPIN 5
+#define TXPIN 6
+#define GPSBAUD 9600
+
+TinyGPS gps; 
+SoftwareSerial uart_gps(RXPIN, TXPIN);  // 실제 RX =6, TX= 5
+
+
+
+SoftwareSerial BTSerial(4, 5); // 오렌지보드 4번 5번핀 블루투스통신
+
+
+void getgps(TinyGPS &gps);
+
+int m=0; // 진동수 변수
+char data; // 블루투스 입출력 데이터
+int state =0;
+
+void setup()
+{
+    Serial.begin(9600);
+    BTSerial.begin(BLEBAUD);
+    uart_gps.begin(GPSBAUD );
+
+    // 통신 포트
+
+  
+  pinMode(REC, OUTPUT); // 녹음핀 출력으로
+  pinMode(PLAYE, OUTPUT); // 재생핀 출력으로
+  pinMode(VIB, INPUT);
+  
+  // 핀모드
+  
+  Serial.println("*********command*********");  // [1. 녹음10초] [2. 재생] [3. 정지] [4. gps] [5. vibration]
+  Serial.println("[1. record]");
+  Serial.println("[2. play]");
+  Serial.println("[3. stop]");
+  Serial.println("[4. vibration]");
+
+  // 컴퓨터 시작화면
+
+
+  BTSerial.println("*********command*********");  // [1. 녹음10초] [2. 재생] [3. 정지] [4. gps] [5. vibration]
+  BTSerial.println("[1. record]");
+  BTSerial.println("[2. play]");
+  BTSerial.println("[3. stop]");
+  BTSerial.println("[4. vibration]");
+  BTSerial.println("[5. gps] ");
+  // 블루투스 시작화면
+  
+}
+
+void loop()
+{
+    long measurement =TP_init(); // 진동수 항상 세기위해서
+
+
+
+    
+    // 블루투스로 부터 수신된 데이터를 읽는다.
+    if (BTSerial.available()) {
+        // 수신된 데이터를 시리얼 모니터에 출력한다.
+        data = BTSerial.read();
+        Serial.write(data);
+        
+        switch (data)
+        {
+          case '1':
+          state=1;
+          digitalWrite(REC,HIGH);
+          Serial.println("REC...");
+          BTSerial.println("REC...");
+          break;
+        
+        case '2':
+        state=2;
+          digitalWrite(PLAYE,HIGH);
+          Serial.println("PLAYE...");
+          BTSerial.println("PLAYE...");
+          digitalWrite(PLAYE,LOW);
+          break;
+       
+    case '3':
+    state=3;
+          digitalWrite(REC,LOW);
+          digitalWrite(PLAYE,LOW);
+          Serial.println("STOP...");
+          BTSerial.println("STOP...");
+          break;
+
+    case '4' :
+    state=4;
+          Serial.print("measurment = ");
+          Serial.println(m);
+          BTSerial.print("measurment = ");
+          BTSerial.println(m);
+          break;
+
+    case '5' :
+    state=5;
+    while(uart_gps.available())     // While there is data on the RX pin...
+    { 
+      int c = uart_gps.read();    // load the data into a variable...
+      if(gps.encode(c))      // if there is a new valid sentence...
+       {
+        getgps(gps);         // then grab the data.
+       }   
+     }
+     break;
+    }
+   }
+    
+}
+
+long TP_init(){
+  delay(10);
+  long measurement=pulseIn (VIB, HIGH);  //wait for the pin to get HIGH and returns measurement
+  if(measurement>1000)
+  m++;
+  return m;
+}
+
+
+void getgps(TinyGPS &gps)
+{
+  // To get all of the data into varialbes that you can use in your code, 
+  // all you need to do is define variables and query the object for the 
+  // data. To see the complete list of functions see keywords.txt file in 
+  // the TinyGPS and NewSoftSerial libs.
+  
+  // Define the variables that will be used
+  float latitude, longitude;
+  // Then call this function
+  gps.f_get_position(&latitude, &longitude);
+  // You can now print variables latitude and longitude
+  Serial.print("Lat/Long: "); 
+  Serial.print(latitude,5); 
+  Serial.print(", "); 
+  Serial.println(longitude,5);
+  
+  // Same goes for date and time
+  int year;
+  byte month, day, hour, minute, second, hundredths;
+  gps.crack_datetime(&year,&month,&day,&hour,&minute,&second,&hundredths);
+  // Print data and time
+  Serial.print("Date: "); Serial.print(month, DEC); Serial.print("/"); 
+  Serial.print(day, DEC); Serial.print("/"); Serial.print(year);
+  Serial.print("  Time: "); Serial.print(hour, DEC); Serial.print(":"); 
+  Serial.print(minute, DEC); Serial.print(":"); Serial.print(second, DEC); 
+  Serial.print("."); Serial.println(hundredths, DEC);
+  //Since month, day, hour, minute, second, and hundr
+  
+  // Here you can print the altitude and course values directly since 
+  // there is only one value for the function
+  Serial.print("Altitude (meters): "); Serial.println(gps.f_altitude());  
+  // Same goes for course
+  Serial.print("Course (degrees): "); Serial.println(gps.f_course()); 
+  // And same goes for speed
+  Serial.print("Speed(kmph): "); Serial.println(gps.f_speed_kmph());
+  Serial.println();
+  
+  // Here you can print statistics on the sentences.
+  unsigned long chars;
+  unsigned short sentences, failed_checksum;
+  gps.stats(&chars, &sentences, &failed_checksum);
+  //Serial.print("Failed Checksums: ");Serial.print(failed_checksum);
+  //Serial.println(); Serial.println();
+}

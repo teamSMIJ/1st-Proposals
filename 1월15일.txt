@@ -1,0 +1,78 @@
+#include <SoftwareSerial.h>
+
+SoftwareSerial mySerial(6, 5); // RX, TX
+int vibr_Pin =3;
+int m=0;
+int state = 0;
+//int REC = 3;
+//int PLAYE = 2;
+
+char input;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(vibr_Pin, INPUT); //set vibr_Pin input for measurment
+  //pinMode(REC, OUTPUT);
+  //pinMode(PLAYE, OUTPUT);
+
+  Serial.println("*********command*********");  // R. 녹음 10초 E. 재생   S. 정지 G. gps
+  Serial.println("G. gps ");
+  Serial.println("V. vibration");
+  Serial.println("SS. stop");
+  mySerial.begin(9600);
+
+
+}
+
+
+
+void loop() {
+  if(Serial.available())
+  {
+    input = Serial.read();
+    if(input == 'V')
+    {
+      vib();
+    }
+    else if(input == 'G')
+    {
+      gps();
+    }
+    else if(input == 'S')
+    {
+      state =0;
+    }
+  }
+  if(state==1) {
+    if (mySerial.available()) {
+      Serial.write(mySerial.read());
+      }
+      if (Serial.available()) {
+        mySerial.write(Serial.read());
+        }
+  }
+  else if(state==2){
+    long measurement =TP_init();
+    Serial.print("measurment = ");
+    Serial.println(m);
+  }
+}
+
+
+void vib() {
+  state = 2;
+}
+
+long TP_init(){
+  delay(10);
+  long measurement=pulseIn (vibr_Pin, HIGH);  //wait for the pin to get HIGH and returns measurement
+  if(measurement>100)
+  m++;
+  return m;
+}
+
+void gps() {
+  state = 1;
+}
+
+

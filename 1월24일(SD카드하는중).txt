@@ -1,0 +1,189 @@
+#include <SoftwareSerial.h>
+#include <TinyGPS.h>
+
+#include <SD.h>
+#include <SPI.h>
+
+SoftwareSerial BTSerial(4, 5);  // 블루투스 통신
+
+#define RXPIN 5
+#define TXPIN 6
+#define GPSBAUD 9600
+
+TinyGPS gps; 
+SoftwareSerial uart_gps(RXPIN, TXPIN);  // 실제 RX =6, TX= 5
+
+void getgps(TinyGPS &gps);
+
+long TP_init();
+
+File myFile;
+
+int vibr_Pin =0; // 진동 핀 0번
+int REC = 3; // 녹음 핀 3번
+int PLAYE = 2; // 재생 핀 2번
+
+char data; // 블루투스 데이터
+int state = 0; // 상태변수
+int m = 0; // 진동 값
+
+void setup() {
+  Serial.begin(9600);
+  uart_gps.begin(GPSBAUD);
+  
+  pinMode(vibr_Pin, INPUT); // 진동핀 입력으로 놓음
+  pinMode(REC, OUTPUT); // 녹음핀 출력으로
+  pinMode(PLAYE, OUTPUT); // 재생핀 출력으로
+  pinMode(10, OUTPUT); // 10번핀 출력으로 10번핀= SD카드에 사용하는 핀
+  
+  
+  Serial.println("*********command*********");  // [R. 녹음10초] [P. 재생] [S. 정지] [G. gps]
+  Serial.println("[1. record]");
+  Serial.println("[2. play]");
+  Serial.println("[3. stop]");
+  Serial.println("[4. vibration]");
+  Serial.println("[5. gps] ");
+  Serial.println("[6. File open]");
+
+ if(!SD.begin(4)){
+    return;
+   }
+}
+
+void loop() {
+
+    if(Serial.available())
+    {
+      data = Serial.read(); 
+    if (data == '1') {  // 녹음
+      state = 3;
+     digitalWrite(REC,HIGH);
+     Serial.println("REC...");
+    } 
+    
+    else if (data == '2') {  // 재생
+      state = 4;
+      digitalWrite(PLAYE,HIGH);
+      Serial.println("PLAYE...");
+    } 
+    
+    else if(data == '3') { // 정지
+      state = 0;
+      digitalWrite(REC,LOW);
+      digitalWrite(PLAYE,LOW);
+      Serial.println("STOP...");
+    }
+    
+    else if(data == '4') { // GPS
+    state = 1;
+    }
+  
+    else if(data == '5') { // 진동수
+     vib();
+     Serial.print("measurment = ");
+     Serial.println(m);
+
+    
+    myFile = SD.open("test.txt", FILE_WRITE);
+    if(myFile){
+    vib();
+    myFile.print("measurement = ");
+    myFile.print(m);
+    myFile.close();
+    }
+    }
+    else if(data == '6') { //파일 열기
+      myFile = SD.open("test.txt");
+      if (myFile) {
+                Serial.println("test.txt:");
+                // test 파일의 내용을 시리얼 모니터에 출력한다.
+                while (myFile.available()) { 
+                Serial.write(myFile.read());
+        }   
+    }
+  }
+    }
+   if(state==1){
+    while(uart_gps.available())     // While there is data on the RX pin...
+    { 
+      int c = uart_gps.read();    // load the data into a variable...
+      if(gps.encode(c))      // if there is a new valid sentence...
+       {
+        getgps(gps);         // then grab the data.
+       }   
+     }
+   }
+  else if(state==2){
+         long measurement = TP_init();
+  } 
+}
+
+void vib() {
+  state = 2;
+}
+
+long TP_init(){
+  long measurement=pulseIn (vibr_Pin, HIGH);
+  if(measurement>100)
+  m++;
+  return m;
+}
+
+
+void getgps(TinyGPS &gps)
+{
+  int year;
+  byte month, day, hour, minute, second, hundredths;
+  float latitude, longitude;
+  // 년도, 월, 날짜, 시, 분, 초, 위도, 경도 등을 저장할 변수 선언
+
+  gps.f_get_position(&latitude, &longitude); // 위도, 경도를 파싱하여 변수에 저장
+  gps.crack_datetime(&year,&month,&day,&hour,&minute,&second,&hundredths); 
+  // 년도, 월, 날짜, 시, 분, 초를 파싱하여 변수에 저장
+
+  hour = hour + 9;
+  // 한국의 시간은 GMT+9 이므로 시간에 9시간을 더함
+
+  if =(hour>24){
+  hour = hour -24;
+  day = day +1;
+  }
+  // 계산한 시간의 값이 24를 초과했다면
+  // 시간 값에서 24를 빼고
+  // 날짜 값에서 1을 더함
+  
+  myFile = SD.open("GPS_TEMP.txt", FILE_WRITE); // 파일을 쓰기모드로 연다.
+
+  if(myFile) {
+   
+  myFile.print(" <trkpt lat=\"");
+  myFile.print(latitude,6); 
+  myFile.print("\" lon=\"");
+  myFile.print(longitude,6);
+  myFile.println("\">");
+  myFile.println(" <ele></ele>");
+
+  myFile.print("   <time>");
+  myFile.print(year);
+  myFile.print("-"); 
+  myFile.print(month); 
+  myFile.print("-"); 
+  myFile.print(day); 
+  myFile.print("T"); 
+  myFile.print(hour); 
+  myFile.print(minute < 10 ? ":0":":"); 
+  myFile.print(minute); 
+  myFile.print(second < 10 ? ":0":":"); 
+  myFile.print(second); 
+  myFile.println("Z</time>");
+
+  myFile.println("   </trkpt>");
+  myFile.close();
+// GPX파일 형식으로 파일을 쓴다.
+  
+  Serial.println("Success!");
+ } else {
+  Serial.println("Fail...");
+  }  
+  delay(5000);
+}

@@ -1,0 +1,208 @@
+
+#include <SoftwareSerial.h>
+#include <TinyGPS.h>
+
+#include <SD.h>
+#include <SPI.h>
+
+
+#define RXPIN 6
+#define TXPIN 5
+#define GPSBAUD 9600
+SoftwareSerial uart_gps(RXPIN, TXPIN);  // 실제 RX =7, TX= 6
+TinyGPS gps; 
+void getgps(TinyGPS &gps);
+
+
+#define BLEBAUD 9600 // 블루투스통신 포트
+SoftwareSerial BTSerial(4, 5); // 오렌지보드 4번 5번핀 블루투스통신
+
+
+
+File myFile; // GPS
+File my2File; // 진동수
+
+#define VIB 0 // 진동핀
+#define REC 3 // 녹음핀
+#define PLAYE 2  // 재생핀
+
+int m=0; // 진동수 변수
+char data; // 블루투스 입출력 데이터
+int state =0;
+
+
+void setup()
+
+{
+    Serial.begin(9600);
+    uart_gps.begin(GPSBAUD);
+    BTSerial.begin(BLEBAUD);
+    
+    
+    
+
+    // 통신 포트
+
+  
+  pinMode(REC, OUTPUT); // 녹음핀 출력으로
+  pinMode(PLAYE, OUTPUT); // 재생핀 출력으로
+  pinMode(VIB, INPUT);
+  pinMode(10, OUTPUT); // 10번핀 출력으로 10번핀= SD카드에 사용하는 핀  
+  // 핀모드
+  
+  Serial.println("*********command*********");  // [1. 녹음10초] [2. 재생] [3. 정지] [4. gps] [5. vibration]
+  Serial.println("[1. record]");
+  Serial.println("[2. play]");
+  Serial.println("[3. stop]");
+  Serial.println("[4. vibration]");
+  Serial.println("[5. gps]");
+
+  // 컴퓨터 시작화면
+
+
+  BTSerial.println("*********command*********");  // [1. 녹음10초] [2. 재생] [3. 정지] [4. gps] [5. vibration]
+  BTSerial.println("[1. record]");
+  BTSerial.println("[2. play]");
+  BTSerial.println("[3. stop]");
+  BTSerial.println("[4. vibration]");
+  BTSerial.println("[5. gps] ");
+  // 블루투스 시작화면
+  if(!SD.begin(4)){
+    return;
+   }
+}
+
+void loop()
+{
+    
+
+    
+    // 블루투스로 부터 수신된 데이터를 읽는다.
+    if (BTSerial.available()) {
+        // 수신된 데이터를 시리얼 모니터에 출력한다.
+        data = BTSerial.read();
+        delay(3);
+        //Serial.write(data);
+        
+        if(data == '1')
+        {
+          state=1;
+          digitalWrite(REC,HIGH);
+          Serial.println("REC...");
+          BTSerial.println("REC...");
+          
+        }
+        else if(data == '2'){
+          state=2;
+          digitalWrite(PLAYE,HIGH);
+          Serial.println("PLAYE...");
+          BTSerial.println("PLAYE...");
+          digitalWrite(PLAYE,LOW);
+        }
+       else if(data == '3'){
+          state=3;
+          digitalWrite(REC,LOW);
+          digitalWrite(PLAYE,LOW);
+          Serial.println("STOP...");
+          BTSerial.println("STOP...");
+       }
+
+        else if(data == '4')
+        {
+          state=4;
+          
+          Serial.print("measurment = ");
+          Serial.println(m);
+          BTSerial.print("measurment = ");
+          BTSerial.println(m);
+          
+          my2File = SD.open("VIB_TEMP.txt", FILE_WRITE);
+          if(my2File){
+             my2File.print("measurement = ");
+             my2File.println(m);
+             my2File.close();
+        }
+       }
+        else if(data == '5')
+        {
+        state=5;
+      }
+    }
+    if(state==5){
+     while(uart_gps.available())     // While there is data on the RX pin...
+    { 
+      int c = uart_gps.read();    // load the data into a variable...
+      if(gps.encode(c))      // if there is a new valid sentence...
+       {
+        getgps(gps);         // then grab the data.
+       }   
+     }
+   }
+  else {
+    long measurement =TP_init(); // 진동수 항상 세기위해서
+  }
+}    
+
+long TP_init(){
+  long measurement=pulseIn (VIB, HIGH);
+  if(measurement>100)
+  m++;
+  return m;
+}
+
+
+void getgps(TinyGPS &gps)
+{
+  int year;
+  byte month, day, hour, minute, second, hundredths;
+  float latitude, longitude;
+  // 년도, 월, 날짜, 시, 분, 초, 위도, 경도 등을 저장할 변수 선언
+
+  gps.f_get_position(&latitude, &longitude); // 위도, 경도를 파싱하여 변수에 저장
+  gps.crack_datetime(&year,&month,&day,&hour,&minute,&second,&hundredths); 
+  // 년도, 월, 날짜, 시, 분, 초를 파싱하여 변수에 저장
+
+  hour = hour + 9;
+  // 한국의 시간은 GMT+9 이므로 시간에 9시간을 더함
+
+  if (hour>24){
+  hour = hour -24;
+  day = day +1;
+  }
+  // 계산한 시간의 값이 24를 초과했다면
+  // 시간 값에서 24를 빼고
+  // 날짜 값에서 1을 더함
+  
+  myFile = SD.open("GPS_TEMP.txt", FILE_WRITE); // 파일을 쓰기모드로 연다.
+
+  if(myFile) {
+   
+  myFile.print(" <trkpt lat=\"");
+  myFile.print(latitude,6); 
+  myFile.print("\" lon=\"");
+  myFile.print(longitude,6);
+  myFile.println("\">");
+  myFile.println(" <ele></ele>");
+
+  myFile.print("   <time>");
+  myFile.print(year);
+  myFile.print("-"); 
+  myFile.print(month); 
+  myFile.print("-"); 
+  myFile.print(day); 
+  myFile.print("T"); 
+  myFile.print(hour); 
+  myFile.print(minute < 10 ? ":0":":"); 
+  myFile.print(minute); 
+  myFile.print(second < 10 ? ":0":":"); 
+  myFile.print(second); 
+  myFile.println("Z</time>");
+
+  myFile.println("   </trkpt>");
+  myFile.close();
+// GPX파일 형식으로 파일을 쓴다.
+  
+  }  
+  delay(5000);
+
+}

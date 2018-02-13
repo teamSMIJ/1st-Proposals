@@ -1,0 +1,96 @@
+// 제작자 : 2N(nms200299)
+// 설명 : GPS위성에서 수신한 데이터를 파싱하여
+//        MicroSD(SD) 카드에 GPX 파일의 형식으로 기록
+
+#include <SoftwareSerial.h>
+#include <TinyGPS.h>
+#include <SPI.h>
+#include <SD.h>
+
+TinyGPS gps;
+SoftwareSerial uart_gps(5, 6); // RX = 3 , TX = 2
+void getgps(TinyGPS &gps);
+
+File myFile;
+
+void setup() {
+  Serial.begin(9600);
+  uart_gps.begin(9600);
+  pinMode(10, OUTPUT); // 10번핀 출력으로 10번핀= SD카드에 사용하는 핀
+ if (!SD.begin(4)) {
+ return;
+ }
+}
+
+void loop() {
+ while(uart_gps.available()){
+ int c = uart_gps.read();
+  if(gps.encode(c)){
+  GetGPS(gps);
+  // GPS 신호가 잡히면 GetGPS 함수 호출
+  }
+ }
+}
+
+
+void GetGPS(TinyGPS &gps) {
+  int year;
+  byte month, day, hour, minute, second, hundredths;
+  float latitude, longitude;
+  // 년도, 월, 날짜, 시, 분, 초, 위도, 경도 등을
+  // 저장할 변수 선언
+
+  gps.f_get_position(&latitude, &longitude);
+  // 위도, 경도를 파싱하여 변수에 저장
+
+  gps.crack_datetime(&year,&month,&day,&hour,&minute,&second,&hundredths);
+  // 년도, 월, 날짜, 시, 분, 초를 파싱하여 변수에 저장
+
+  hour = hour + 9;
+  // 한국의 시간은 GMT+9 이므로 시간에 9시간을 더한다
+
+  if (hour > 24){
+  hour = hour - 24;
+  day = day + 1;
+  }
+  // 계산한 시간의 값이 24를 초과 했다면
+  // 시간 값에서 24를 빼고
+  // 날짜 값에서 1을 더한다
+
+    myFile = SD.open("GPS_TEMP.txt", FILE_WRITE);
+    // 파일을 쓰기모드로 연다
+
+    if (myFile) {
+
+    myFile.print("      <trkpt lat=\"");
+    myFile.print(latitude,6);
+    myFile.print("\" lon=\"");
+    myFile.print(longitude,6);
+    myFile.println("\">");
+    myFile.println("        <ele></ele>");
+
+    myFile.print("        <time>");
+    myFile.print(year);
+    myFile.print("-");
+    myFile.print(month);
+    myFile.print("-");
+    myFile.print(day);
+    myFile.print("T");
+    myFile.print(hour);
+    myFile.print(minute < 10  ? ":0":":");
+    myFile.print(minute);
+    myFile.print(second < 10  ? ":0":":");
+    myFile.print(second);
+    myFile.println("Z</time>");
+
+    myFile.println("      </trkpt>");
+    myFile.close();
+   // GPX파일 형식으로 파일을 쓴다
+
+    Serial.println("Success!");
+   } else {
+    Serial.println("Fail...");
+   }
+
+   delay(5000);
+ }

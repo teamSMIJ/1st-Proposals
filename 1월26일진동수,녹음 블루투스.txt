@@ -1,0 +1,78 @@
+
+#include <SoftwareSerial.h>
+
+SoftwareSerial BTSerial(4, 5);
+
+int REC = 3; // 녹음 핀 3번
+int PLAYE = 2; // 재생 핀 2번
+int vibr_Pin =0; // 진동감도핀 0번
+int m=0; // 진동수 변수
+
+char data; // 블루투스 입출력 데이터
+
+
+
+void setup()
+{
+    Serial.begin(9600);
+    BTSerial.begin(9600);
+   
+  pinMode(REC, OUTPUT); // 녹음핀 출력으로
+  pinMode(PLAYE, OUTPUT); // 재생핀 출력으로
+  pinMode(vibr_Pin, INPUT);
+  
+  Serial.println("*********command*********");  // [1. 녹음10초] [2. 재생] [3. 정지] [4. gps] [5. vibration]
+  Serial.println("[1. record]");
+  Serial.println("[2. play]");
+  Serial.println("[3. stop]");
+
+}
+
+void loop()
+{
+    long measurement =TP_init();
+    // 블루투스로 부터 수신된 데이터를 읽는다.
+    if (BTSerial.available()) {
+        // 수신된 데이터를 시리얼 모니터에 출력한다.
+        data = BTSerial.read();
+        //Serial.write(data);
+    if (data == '1') {  // 녹음
+      
+     digitalWrite(REC,HIGH);
+     Serial.println("REC...");
+     //BTSerial.println("REC...");
+    } 
+    
+    else if (data == '2') {  // 재생
+      
+      digitalWrite(PLAYE,HIGH);
+      Serial.println("PLAYE...");
+
+      BTSerial.println("PLAYE...");
+      digitalWrite(PLAYE,LOW);
+    } 
+    
+    else if(data == '3') { // 정지
+      
+      digitalWrite(REC,LOW);
+      digitalWrite(PLAYE,LOW);
+      Serial.println("STOP...");
+      BTSerial.println("STOP...");
+    }
+    else if(data == '4') {
+       Serial.print("measurment = ");
+       Serial.println(m);
+
+       BTSerial.print("measurment = ");
+       BTSerial.println(m);
+    }
+  }
+}
+
+long TP_init(){
+  delay(10);
+  long measurement=pulseIn (vibr_Pin, HIGH);  //wait for the pin to get HIGH and returns measurement
+  if(measurement>1000)
+  m++;
+  return m;
+}

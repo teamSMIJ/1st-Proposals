@@ -1,0 +1,69 @@
+#include <SoftwareSerial.h>
+
+SoftwareSerial mySerial(6, 5); // RX, TX
+
+int REC = 3;
+int PLAYE = 2;
+
+char input;
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(REC, OUTPUT);
+  pinMode(PLAYE, OUTPUT);
+
+  Serial.println("*********command*********");  // R. 녹음 10초 E. 재생   S. 정지 G. gps
+  Serial.println("R. record 10sec");
+  Serial.println("E. play ");
+  Serial.println("S. stop ");
+  Serial.println("G. gps ");
+  mySerial.begin(9600);
+
+
+}
+
+
+
+void loop() {
+
+  if (mySerial.available()) {
+
+    Serial.write(mySerial.read());
+
+  }
+
+  if (Serial.available()) {
+    sound();
+    mySerial.write(Serial.read());
+
+  }
+}
+
+void sound() {
+  if(Serial.available())
+  {
+    input = Serial.read();
+    
+    if(input == 'R')
+    {
+      digitalWrite(REC,HIGH);
+      Serial.println("REC...");
+    }
+    else if(input == 'E')
+    {
+      digitalWrite(PLAYE,HIGH);
+      Serial.println("PLAYE...");
+      digitalWrite(PLAYE,LOW);
+    }
+    else if(input == 'S')
+    {
+      digitalWrite(REC,LOW);
+      Serial.println("STOP...");
+    }
+    else
+    {
+      Serial.println("wrong input value");
+    }
+  }
+}
